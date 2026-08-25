@@ -1,8 +1,6 @@
 package main
 
 import (
-	"runtime"
-	"syscall"
 	"time"
 )
 
@@ -25,26 +23,4 @@ func (w workSpan) elapsed() time.Duration {
 		}
 	}
 	return time.Since(w.wall0)
-}
-
-func threadCPU() (time.Duration, bool) {
-	if runtime.GOOS != "linux" {
-		return 0, false
-	}
-	var ru syscall.Rusage
-	if err := syscall.Getrusage(syscall.RUSAGE_THREAD, &ru); err != nil {
-		return 0, false
-	}
-	return timevalDuration(ru.Utime) + timevalDuration(ru.Stime), true
-}
-
-func timevalDuration(tv syscall.Timeval) time.Duration {
-	return time.Duration(tv.Sec)*time.Second + time.Duration(tv.Usec)*time.Microsecond
-}
-
-func dutyClockName() string {
-	if runtime.GOOS == "linux" {
-		return "thread-CPU (RUSAGE_THREAD)"
-	}
-	return "wall-clock"
 }
