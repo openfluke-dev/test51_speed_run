@@ -1,0 +1,4 @@
+speed_ckpt/
+test51_speed_run
+*.log
+.env

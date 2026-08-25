@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>test51 · tree sweep</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #171d25;
+      --ink: #e8eef5;
+      --muted: #8b9aab;
+      --line: #2a3441;
+      --accent: #3dd6c6;
+      --good: #6bcf7f;
+      --bad: #e86a6a;
+      --warn: #e0b44e;
+      --chip: #243041;
+      --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 14px/1.45 var(--font);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 10% -10%, #1a3a3a55, transparent),
+        radial-gradient(ellipse 60% 40% at 100% 0%, #2a243855, transparent);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 1rem 1.25rem 2rem; }
+    header {
+      display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+      justify-content: space-between; margin-bottom: 1rem;
+    }
+    h1 { margin: 0; font-size: 1.45rem; letter-spacing: -0.02em; }
+    h1 em { color: var(--accent); font-style: normal; }
+    .sub { color: var(--muted); margin: 0.25rem 0 0; max-width: 42rem; }
+    button#start {
+      background: var(--accent); color: #062a28; border: 0; border-radius: 6px;
+      font: 600 14px/1.25 var(--font); padding: 0.65rem 1.1rem; cursor: pointer;
+      max-width: 22rem; white-space: normal; text-align: center;
+    }
+    button#start:disabled { opacity: 0.5; cursor: default; }
+    .plan {
+      margin-top: 0.45rem; font-family: var(--mono); font-size: 11px;
+      color: var(--muted); max-width: 22rem; line-height: 1.35;
+    }
+    .status { margin-top: 0.35rem; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+    .tree-banner {
+      background: linear-gradient(135deg, #1c2836, #15202b);
+      border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+    }
+    .tree-banner .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .tree-banner h2 { margin: 0.2rem 0 0.55rem; font-size: 1.15rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .chip {
+      background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+      padding: 0.2rem 0.65rem; font-family: var(--mono); font-size: 12px;
+    }
+    .chip.mode { border-color: #3dd6c688; color: var(--accent); }
+    .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.85rem; }
+    @media (max-width: 700px) { .bars { grid-template-columns: 1fr; } }
+    .bar-lab { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 0.25rem; }
+    progress { width: 100%; height: 8px; accent-color: var(--accent); }
+
+    .grid {
+      display: grid; grid-template-columns: 280px 1fr; gap: 1rem;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      overflow: hidden;
+    }
+    .panel h3 {
+      margin: 0; padding: 0.65rem 0.9rem; font-size: 0.8rem; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--line);
+    }
+    #play {
+      width: 100%; height: 220px; display: block; background: #0b1016;
+    }
+    .play-meta {
+      padding: 0.5rem 0.9rem; font-family: var(--mono); font-size: 11px; color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    .table-scroll { max-height: 420px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { padding: 0.4rem 0.55rem; text-align: left; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+    tr.active { background: #1e3a3a66; }
+    tr.done td { color: #b8c4d0; }
+    .delta.pos { color: var(--good); }
+    .delta.neg { color: var(--bad); }
+    .phase { font-family: var(--mono); font-size: 11px; color: var(--warn); }
+    .phase.done { color: var(--good); }
+    .phase.pending { color: var(--muted); }
+
+    .reports { margin-top: 1rem; }
+    .chal-group { margin-bottom: 1.25rem; }
+    .chal-group h4 {
+      margin: 0 0 0.5rem; font-size: 0.85rem; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted); font-weight: 600;
+    }
+    .chal-group.active-chal h4 { color: var(--accent); }
+    .report {
+      border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem;
+      margin-bottom: 0.55rem; background: #141b24;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      text-decoration: none; color: inherit; display: block;
+    }
+    .report:hover { border-color: #3dd6c688; background: #1a2430; }
+    .report header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; margin-bottom: 0.35rem; }
+    .report strong { font-size: 0.95rem; }
+    .report .best { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .report .open { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .empty { color: var(--muted); padding: 1rem; font-size: 13px; }
+
+    .lpd-boards { margin-top: 1rem; }
+    .lpd-grid {
+      display: grid; gap: 0.75rem;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+    .lpd-board {
+      border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.85rem;
+      background: #141b24;
+    }
+    .lpd-board.active-chal { border-color: #3dd6c688; }
+    .lpd-board header {
+      display: flex; flex-wrap: wrap; gap: 0.35rem 0.65rem; align-items: baseline;
+      margin-bottom: 0.45rem; font-size: 12px; color: var(--muted);
+    }
+    .lpd-board header strong {
+      color: var(--ink); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .lpd-board ol {
+      margin: 0; padding-left: 1.15rem; font-family: var(--mono); font-size: 11.5px;
+      color: #b8c4d0;
+    }
+    .lpd-board li { margin-bottom: 0.2rem; }
+    .lpd-board .champs { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-bottom: 0.4rem; }
+
+    footer {
+      margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--line);
+      color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 1rem;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>test51 <em>tree sweep</em></h1>
+        <p class="sub">
+          One architecture at a time: <b>mode · layer · dtype · challenge</b>, then sweep
+          <b>LR↑ × cams × 1³…3³</b>. Consolidations and LPD are per-challenge — chase never ranks against teleport.
+        </p>
+      </div>
+      <div style="text-align:right">
+        <button id="start" type="button">Start</button>
+        <div class="plan" id="planHint">waiting for plan…</div>
+        <div class="status" id="status">waiting</div>
+      </div>
+    </header>
+
+    <section class="tree-banner" id="treeBanner">
+      <div class="label">Active tree</div>
+      <h2 id="treeTitle">—</h2>
+      <div class="chips" id="treeChips"></div>
+      <div class="bars">
+        <div>
+          <div class="bar-lab"><span>Trees</span><span id="treeCounts">0 / 0</span></div>
+          <progress id="treeProg" value="0" max="100"></progress>
+        </div>
+        <div>
+          <div class="bar-lab"><span>Leaves in tree</span><span id="leafCounts">0 / 0</span></div>
+          <progress id="leafProg" value="0" max="100"></progress>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <h3>Playfield</h3>
+        <canvas id="play" width="560" height="440"></canvas>
+        <div class="play-meta" id="playMeta">agent / goal · think K</div>
+      </section>
+
+      <section class="panel">
+        <h3>Current tree · LR × cam × grid</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>LR</th><th>Cam</th><th>Grid</th><th>Phase</th>
+                <th>Acc</th><th>Score</th><th>Δacc</th><th>Δ%</th>
+              </tr>
+            </thead>
+            <tbody id="board"></tbody>
+          </table>
+          <div class="empty" id="boardEmpty">Board clears after each finished tree.</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="reports panel" style="margin-top:1rem">
+      <h3>Consolidation reports · per challenge · best → worst</h3>
+      <div id="reports" class="empty">No trees finished yet.</div>
+    </section>
+
+    <section class="lpd-boards panel">
+      <h3>LPD sub-leaderboards · one per challenge</h3>
+      <div id="lpdBoards" class="empty">No finished leaves yet.</div>
+    </section>
+
+    <footer>
+      <div id="lpd">active LPD —</div>
+      <div id="jobMeta">job —</div>
+      <div id="tideLink"></div>
+    </footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const startBtn = $("start");
+    let activeID = "";
+
+    startBtn.onclick = async () => {
+      startBtn.disabled = true;
+      await fetch("/api/start", { method: "POST" });
+    };
+
+    function fmt(n, d = 1) {
+      if (n == null || Number.isNaN(n)) return "—";
+      return Number(n).toFixed(d);
+    }
+    function delta(n) {
+      if (n == null || Number.isNaN(n)) return "—";
+      const cls = n > 0.05 ? "pos" : n < -0.05 ? "neg" : "";
+      const s = (n >= 0 ? "+" : "") + fmt(n);
+      return `<span class="delta ${cls}">${s}</span>`;
+    }
+
+    function renderTree(t) {
+      if (!t || !t.key) {
+        $("treeTitle").textContent = "—";
+        $("treeChips").innerHTML = "";
+        return;
+      }
+      $("treeTitle").textContent = `${t.mode} · ${t.challenge}`;
+      $("treeChips").innerHTML = [
+        ["mode", t.mode],
+        ["layer", t.layer],
+        ["dtype", t.dtype],
+        ["challenge", t.challenge],
+      ].map(([k, v]) => `<span class="chip ${k === "mode" ? "mode" : ""}">${k} ${v}</span>`).join("");
+      const ti = t.index || 0, tt = t.total || 0;
+      const ld = t.leaf_done || 0, lt = t.leaf_total || 0;
+      $("treeCounts").textContent = `${ti} / ${tt}`;
+      $("leafCounts").textContent = `${ld} / ${lt}`;
+      $("treeProg").value = tt ? (100 * ti) / tt : 0;
+      $("leafProg").value = lt ? (100 * ld) / lt : 0;
+    }
+
+    function renderBoard(rows) {
+      const tb = $("board");
+      tb.innerHTML = "";
+      const empty = $("boardEmpty");
+      if (!rows || !rows.length) {
+        empty.style.display = "block";
+        return;
+      }
+      empty.style.display = "none";
+      rows.forEach((r) => {
+        const tr = document.createElement("tr");
+        if (r.id === activeID) tr.classList.add("active");
+        if (r.done) tr.classList.add("done");
+        const phase = r.done ? "done" : (r.phase || "pending");
+        tr.innerHTML = `
+          <td>${fmt(r.lr, r.lr >= 100 ? 0 : 2)}</td>
+          <td>${r.cams ?? "—"}</td>
+          <td>${r.grid_n || 1}³</td>
+          <td class="phase ${phase}">${phase}</td>
+          <td>${fmt(r.acc)}</td>
+          <td>${fmt(r.score, 0)}</td>
+          <td>${delta(r.acc_delta)}</td>
+          <td>${delta(r.improve_pct)}</td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    const CHAL_ORDER = ["chase", "flee", "collect", "teleport", "shock"];
+
+    function sortChallenges(keys) {
+      return keys.slice().sort((a, b) => {
+        const ia = CHAL_ORDER.indexOf(a);
+        const ib = CHAL_ORDER.indexOf(b);
+        if (ia < 0 && ib < 0) return a.localeCompare(b);
+        if (ia < 0) return 1;
+        if (ib < 0) return -1;
+        return ia - ib;
+      });
+    }
+
+    function reportRank(a, b) {
+      const ds = (b.best_score ?? 0) - (a.best_score ?? 0);
+      if (ds) return ds;
+      const da = (b.best_acc ?? 0) - (a.best_acc ?? 0);
+      if (da) return da;
+      return (b.best_acc_delta ?? 0) - (a.best_acc_delta ?? 0);
+    }
+
+    function renderReportCard(r, rank) {
+      const n = r.index || 0;
+      const href = r.url || (n ? `/report/${n}` : "#");
+      return `
+        <a class="report" href="${href}" target="_blank" rel="noopener">
+          <header>
+            <strong>#${rank} ${r.mode}</strong>
+            <span class="chip">${r.layer}/${r.dtype}</span>
+            <span class="chip">${r.leaves} leaves</span>
+            <span class="open">full report ↗</span>
+          </header>
+          <div class="best">
+            best Acc ${fmt(r.best_acc)} · Score ${fmt(r.best_score, 0)} ·
+            lr ${fmt(r.best_lr, r.best_lr >= 100 ? 0 : 2)} · cam ${r.best_cams} · grid ${r.best_grid}³
+            · Δacc ${fmt(r.best_acc_delta)}
+          </div>
+        </a>`;
+    }
+
+    function renderReports(reps, activeChal) {
+      const el = $("reports");
+      if (!reps || !reps.length) {
+        el.className = "empty";
+        el.textContent = "No trees finished yet.";
+        return;
+      }
+      const by = {};
+      reps.forEach((r) => {
+        const c = r.challenge || "unknown";
+        (by[c] || (by[c] = [])).push(r);
+      });
+      el.className = "";
+      el.innerHTML = sortChallenges(Object.keys(by)).map((chal) => {
+        const group = by[chal].slice().sort(reportRank);
+        const active = chal === activeChal ? " active-chal" : "";
+        return `<div class="chal-group${active}">
+          <h4>${chal}</h4>
+          ${group.map((r, i) => renderReportCard(r, i + 1)).join("")}
+        </div>`;
+      }).join("");
+    }
+
+    function renderLPD(byChal, activeChal) {
+      const el = $("lpdBoards");
+      const keys = Object.keys(byChal || {});
+      if (!keys.length) {
+        el.className = "empty";
+        el.textContent = "No finished leaves yet.";
+        $("lpd").textContent = "active LPD —";
+        return;
+      }
+      el.className = "lpd-grid";
+      el.innerHTML = sortChallenges(keys).map((chal) => {
+        const lpd = byChal[chal] || {};
+        const active = chal === activeChal ? " active-chal" : "";
+        const top = (lpd.top || []).slice(0, 5);
+        const list = top.length
+          ? `<ol>${top.map((r) =>
+              `<li>${r.mode || "—"} · ${r.dtype || ""} · Acc ${fmt(r.avg_accuracy)} · LPD ${fmt(r.lpd, 2)}</li>`
+            ).join("")}</ol>`
+          : `<div class="empty" style="padding:0.25rem 0">n=${lpd.n || 0} · no ranked rows yet</div>`;
+        return `<div class="lpd-board${active}">
+          <header><strong>${chal}</strong><span>n=${lpd.n || 0}</span></header>
+          <div class="champs">champ ${lpd.champ?.mode || "—"} · ${lpd.champ?.dtype || ""} · live ${lpd.live_champ?.mode || "—"}</div>
+          ${list}
+        </div>`;
+      }).join("");
+      const active = byChal[activeChal] || byChal[sortChallenges(keys)[0]] || {};
+      const label = activeChal || sortChallenges(keys)[0] || "—";
+      $("lpd").innerHTML =
+        `active <strong>${label}</strong> · champ=<strong>${active.champ?.mode || "—"}</strong> · live=<strong>${active.live_champ?.mode || "—"}</strong>`;
+    }
+
+    // Simple 2D playfield — agent + goal from live.play (parsed from layer colors).
+    const canvas = $("play");
+    const ctx = canvas.getContext("2d");
+    let trail = [];
+    let lastAx = -1, lastAy = -1;
+
+    // Fallback: scan frame.layers[0] for agent=1, goal=2 (row-major y,x).
+    function playFromLayers(frame) {
+      const layer = frame && frame.layers && frame.layers[0];
+      if (!layer || !layer.length) return null;
+      const h = layer.length, w = layer[0].length;
+      let ax = null, ay = null, gx = null, gy = null;
+      for (let y = 0; y < h; y++) {
+        const row = layer[y];
+        for (let x = 0; x < row.length; x++) {
+          if (row[x] === 1) { ax = x; ay = y; }
+          if (row[x] === 2) { gx = x; gy = y; }
+        }
+      }
+      if (ax == null && gx == null) return null;
+      return {
+        agent_x: ax != null ? (ax + 0.5) / w : 0.5,
+        agent_y: ay != null ? (ay + 0.5) / h : 0.5,
+        goal_x: gx != null ? (gx + 0.5) / w : 0.8,
+        goal_y: gy != null ? (gy + 0.5) / h : 0.2,
+        ok: true,
+      };
+    }
+
+    function drawPlay(play, thinkK) {
+      const W = canvas.width, H = canvas.height;
+      ctx.fillStyle = "#0b1016";
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "#1c2733";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 8; i++) {
+        const x = (i / 8) * W, y = (i / 8) * H;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+      if (!play) return;
+      const ax = (play.agent_x ?? 0.5) * W;
+      const ay = (play.agent_y ?? 0.5) * H;
+      const gx = (play.goal_x ?? 0.8) * W;
+      const gy = (play.goal_y ?? 0.2) * H;
+      if (Math.abs(ax - lastAx) > 0.5 || Math.abs(ay - lastAy) > 0.5) {
+        trail.push({ x: ax, y: ay });
+        if (trail.length > 48) trail.shift();
+        lastAx = ax; lastAy = ay;
+      }
+      ctx.strokeStyle = "#3dd6c655";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      trail.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+      ctx.stroke();
+      // goal
+      ctx.fillStyle = "#ffb020";
+      ctx.beginPath(); ctx.arc(gx, gy, 10, 0, Math.PI * 2); ctx.fill();
+      // agent
+      ctx.fillStyle = "#2dff9a";
+      ctx.beginPath(); ctx.arc(ax, ay, 9, 0, Math.PI * 2); ctx.fill();
+      // think orbs
+      const k = thinkK || 0;
+      for (let i = 0; i < k; i++) {
+        const a = (i / Math.max(k, 1)) * Math.PI * 2 + performance.now() / 600;
+        ctx.fillStyle = "#3dd6c6aa";
+        ctx.beginPath();
+        ctx.arc(ax + Math.cos(a) * 22, ay + Math.sin(a) * 22, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/live", { cache: "no-store" });
+        const live = await res.json();
+        $("status").textContent = live.status || "—";
+        const plan = live.plan || {};
+        const planEl = $("planHint");
+        if (planEl) {
+          if (plan.label) {
+            planEl.textContent =
+              `${plan.trees || 0} trees · ${plan.leaves || 0} leaves · ${plan.pending || 0} pending` +
+              (plan.full ? " · full permute" : "") +
+              `\ndtypes=${plan.dtypes || "—"} · challenges=${plan.challenges || "—"} · lrs=${plan.lrs || "—"} · cams=${plan.cams || "—"} · grids=${plan.grids || "—"}`;
+          } else {
+            planEl.textContent = "waiting for plan…";
+          }
+        }
+        if (!live.started && plan.label) {
+          startBtn.textContent = `Start · ${plan.label}`;
+        } else if (live.started) {
+          startBtn.textContent = "Running";
+        }
+        if (live.started || (live.status && !String(live.status).includes("waiting for Start"))) startBtn.disabled = true;
+        activeID = live.job_id || "";
+        renderTree(live.tree);
+        renderBoard(live.board);
+        const activeChal = live.active_challenge || live.tree?.challenge || "";
+        renderReports(live.reports, activeChal);
+        renderLPD(live.lpd_by_challenge || {}, activeChal);
+        const play = (live.play && live.play.ok) ? live.play : playFromLayers(live.frame);
+        drawPlay(play, live.think_k);
+        const act = live.action || {};
+        $("playMeta").textContent =
+          `mode ${live.mode || "—"} · think ${live.think_k ?? "—"} · action ${act.id ?? "—"} · levels ${live.frame?.levels_completed ?? 0}`;
+        $("jobMeta").textContent = `phase ${live.phase || "—"} · ${live.job_index || 0}/${live.job_total || 0} · ${live.job_id || "—"}`;
+        const tideEl = $("tideLink");
+        if (tideEl) {
+          if (live.tide_url) {
+            const port = String(live.tide_url).replace(/^.*:/, "");
+            const href = `${location.protocol}//${location.hostname}:${port}`;
+            tideEl.innerHTML = `Tide Lucy · <a href="${href}" target="_blank" rel="noopener">${href}</a>`;
+          } else {
+            tideEl.textContent = "";
+          }
+        }
+      } catch (e) {
+        $("status").textContent = "poll error";
+      }
+    }
+    setInterval(tick, 300);
+    tick();
+  </script>
+</body>
+</html>
