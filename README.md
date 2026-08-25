@@ -37,6 +37,25 @@ Each selected layer writes **`speed_ckpt/<layer>/`**. Workers stay on for every 
 
 Fedora ports: `../unlock-ports.sh` (parent test51 script).
 
+## Docker (crash → restart forever, resume ckpt)
+
+Needs sibling `tide/` + `webgpu/` next to `welvet/` (same layout as parent test51 compose).
+
+```bash
+cd apps/aai/test51/test51_speed_run
+
+# kill any native go run still on :5151 / :8080 first
+./run-docker.sh              # build + up -d (restart: always)
+./run-docker.sh --logs
+./run-docker.sh --status
+./run-docker.sh --stop
+```
+
+Defaults: `SPEED_LAYER=all`, `SPEED_WORKERS=4`, `SPEED_RESUME=true`, volume `./speed_ckpt`.
+Crashes (OOM etc.) bring the container back; done job IDs are skipped.
+
+Dash `:5151` · Tide `:8080`.
+
 ## Layout
 
 ```

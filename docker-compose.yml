@@ -1,0 +1,42 @@
+# test51 speed-run — full permute, resume, restart forever on crash.
+#
+# From this directory (Mac Mini or Linux):
+#   cp .env.example .env   # optional tweaks
+#   ./run-docker.sh
+#
+# Build context = parent of welvet/ (needs sibling tide/ + webgpu/).
+#   …/git/welvet/...  → context …/git
+#   …/chaosglue/welvet/... → context …/chaosglue
+#
+# Dash :5151 · Tide :8080 · ckpt volume ./speed_ckpt
+
+services:
+  speed-run:
+    build:
+      context: ../../../../..
+      dockerfile: welvet/apps/aai/test51/test51_speed_run/Dockerfile
+    container_name: test51-speed
+    env_file:
+      - .env
+    environment:
+      SPEED_ADDR: "0.0.0.0:5151"
+      SPEED_TIDE_ADDR: "0.0.0.0:8080"
+      SPEED_CKPT_ROOT: "/app/speed_ckpt"
+      SPEED_LAYER: "${SPEED_LAYER:-all}"
+      SPEED_MODES: "${SPEED_MODES:-all}"
+      SPEED_FULL: "true"
+      SPEED_AUTOSTART: "true"
+      SPEED_RESUME: "true"
+      # Cap workers — NumCPU on the Mini + multicore tiles was OOMing.
+      SPEED_WORKERS: "${SPEED_WORKERS:-4}"
+      GOMEMLIMIT: "${GOMEMLIMIT:-6GiB}"
+      GOGC: "${GOGC:-50}"
+    ports:
+      - "${SPEED_PORT:-5151}:5151"
+      - "${TIDE_PORT:-8080}:8080"
+    volumes:
+      - ./speed_ckpt:/app/speed_ckpt
+    restart: always
+    working_dir: /app
+    # Soft ceiling so a goroutine storm dies and Docker brings it back clean.
+    mem_limit: ${SPEED_MEM_LIMIT:-7g}
