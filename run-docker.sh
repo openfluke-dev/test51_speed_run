@@ -20,6 +20,17 @@ if [[ ! -d "$ROOT/welvet" || ! -d "$ROOT/tide" || ! -d "$ROOT/webgpu" ]]; then
   exit 1
 fi
 
+# Prefer Compose V2 plugin; fall back to docker-compose V1 binary.
+if docker compose version >/dev/null 2>&1; then
+  dc() { docker compose --project-name "$PROJECT" "$@"; }
+elif command -v docker-compose >/dev/null 2>&1; then
+  dc() { docker-compose --project-name "$PROJECT" "$@"; }
+else
+  echo "error: need 'docker compose' (plugin) or 'docker-compose'" >&2
+  echo "  Docker Desktop: enable Compose V2, or: brew install docker-compose" >&2
+  exit 1
+fi
+
 cmd="${1:-up}"
 case "$cmd" in
   up|"")
@@ -39,7 +50,7 @@ case "$cmd" in
         fi
       done
     fi
-    docker compose -p "$PROJECT" up --build -d
+    dc up --build -d
     echo
     echo "up · project=$PROJECT  restart=always  resume=true"
     echo "  dash  http://localhost:${SPEED_PORT:-5151}"
@@ -48,18 +59,18 @@ case "$cmd" in
     echo "  logs  ./run-docker.sh --logs"
     ;;
   --logs|logs)
-    docker compose -p "$PROJECT" logs -f --tail=80
+    dc logs -f --tail=80
     ;;
   --stop|stop)
-    docker compose -p "$PROJECT" down
+    dc down
     ;;
   --status|status)
-    docker compose -p "$PROJECT" ps
+    dc ps
     echo
-    docker compose -p "$PROJECT" logs --tail=30
+    dc logs --tail=30
     ;;
   --restart|restart)
-    docker compose -p "$PROJECT" restart
+    dc restart
     ;;
   *)
     echo "Usage: $0 [up|--logs|--stop|--status|--restart]" >&2
